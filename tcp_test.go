@@ -30,12 +30,6 @@ func TestTCP(t *testing.T) {
 		}()
 	}()
 
-	config, err := NewConfigFromFile("tmp/allow_localhost.json")
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	tcpProxy := NewTCP(
 		"127.0.0.1:7777",   // from
 		"127.0.0.1:8888",   // to
