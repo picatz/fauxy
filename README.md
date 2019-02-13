@@ -1,6 +1,6 @@
 # fauxy
 
-A fauxy reverse proxy.
+Work in progress.
 
 ## Request Handling
 
@@ -13,7 +13,8 @@ TCP Connection -> FROM: Fauxy Proxy :TO -> TCP Connection
                |_____________|___________|
       Hexdump -|             |           |- Hexdump
                |_____________|___________|
-               
+               |
+
 ```
 
 ## Configuration
