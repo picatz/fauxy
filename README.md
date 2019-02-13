@@ -35,14 +35,13 @@ TCP Connection -> FROM: Fauxy Proxy :TO -> TCP Connection
         }
     },
     "hexdump": true,
-    "replace": {
-        "*": "hello world!"
-    },
     "monitor": {
         "from": true,
         "to": true,
     },
-    "logStdout": true,
-    "logFile": "fauxy.80.to.8080.log"
+    "log": {
+        "stdout": true,
+        // "file": "fauxy.80.to.8080.log"
+    }
 }
 ```
