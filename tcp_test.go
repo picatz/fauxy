@@ -16,25 +16,29 @@ func TestTCP(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		go func() {
-			for {
-				conn, err := server.Accept()
-				if err != nil {
-					t.Fatal(err)
-				}
-				go func() {
-					defer conn.Close()
-					conn.Write([]byte("hello world\n"))
-				}()
+		for {
+			conn, err := server.Accept()
+			if err != nil {
+				t.Fatal(err)
 			}
-		}()
+			buff := make([]byte, 12)
+			conn.Read(buff)
+			fmt.Println("server read:", string(buff))
+			go func() {
+				defer conn.Close()
+				conn.Write([]byte("hello world\n"))
+			}()
+		}
+
 	}()
 
-	tcpProxy := NewTCP(
-		"127.0.0.1:7777",   // from
-		"127.0.0.1:8888",   // to
-		NewDefaultConfig(), // config
-	)
+	config, err := NewConfigFromFile("tmp/tcp_test.json")
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tcpProxy := NewTCP(config)
 
 	tcpProxy.Start()
 
@@ -46,6 +50,8 @@ func TestTCP(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		defer conn.Close()
+		conn.Write([]byte("anybody there?"))
 		message, err := bufio.NewReader(conn).ReadString('\n')
 		if err != nil {
 			t.Fatal(err)
