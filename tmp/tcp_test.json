@@ -1,0 +1,15 @@
+{
+    "from": "127.0.0.1:7777",
+    "to": "127.0.0.1:8888",
+    "policies": {
+        "timeout": 1000000000,
+        "allow": ["127.0.0.1"]
+    },
+    "monitor": {
+        "from": true,
+        "to": true
+    },
+    "log": {
+        "stderr": true
+    }
+}
