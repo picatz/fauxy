@@ -2,29 +2,33 @@ package fauxy
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
 	"sync"
-	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // TCP facilitates the connection(s) from one TCP endpoint to anouther.
 type TCP struct {
-	from    string
-	to      string
-	done    chan struct{}
-	config  *Config
-	timeout time.Duration
+	Config *Config
+	done   chan struct{}
 }
 
 // NewTCP needs to be documented.
-func NewTCP(from, to string, config *Config) Proxy {
+func NewTCP(config *Config) Proxy {
+	if config.Log.Stdout {
+		log.SetOutput(os.Stdout)
+	}
+	if config.Log.Stderr {
+		log.SetOutput(os.Stderr)
+	}
 	return &TCP{
-		from:    from,
-		to:      to,
-		config:  config,
-		timeout: time.Second * 3,
+		Config: config,
+		done:   make(chan struct{}),
 	}
 }
 
@@ -33,24 +37,22 @@ func NewTCPWithConfigFile(from, to, configFilename string) (Proxy, error) {
 	var config *Config
 	var err error
 	if configFilename == "" {
-		config = NewDefaultConfig()
-	} else {
-		config, err = NewConfigFromFile(configFilename)
-		if err != nil {
-			return nil, err
-		}
+		return nil, errors.New("no filename given")
+	}
+	config, err = NewConfigFromFile(configFilename)
+	if err != nil {
+		return nil, err
 	}
 
 	return &TCP{
-		from:    from,
-		to:      to,
-		config:  config,
-		timeout: time.Second * 3,
+		Config: config,
+		done:   make(chan struct{}),
 	}, nil
 }
 
 // Stop needs to be documented.
 func (p *TCP) Stop() error {
+	log.Warn("Stopping proxy")
 	if p.done == nil {
 		return errors.New("tcp server already stopped")
 	}
@@ -61,10 +63,13 @@ func (p *TCP) Stop() error {
 
 // Start needs to be documented.
 func (p *TCP) Start() error {
+	log.WithFields(log.Fields{
+		"config": p.Config,
+	}).Info("Starting proxy")
 	if p.done == nil {
 		p.done = make(chan struct{})
 	}
-	listener, err := net.Listen("tcp", p.from)
+	listener, err := net.Listen("tcp", p.Config.From)
 	if err != nil {
 		return err
 	}
@@ -82,59 +87,118 @@ func (p *TCP) Start() error {
 			}
 		}
 	}()
+	log.Info("Started proxy")
 	return nil
 }
 
 func (p *TCP) handle(connection net.Conn) {
 	defer connection.Close()
 
-	// apply config policy
-
-	if p.config != nil {
-		if p.config.denyAll {
-			return // block connection
-		}
-
-		remoteIP := net.ParseIP(strings.Split(connection.RemoteAddr().String(), ":")[0])
-
-		if !p.config.allowAll {
-			for _, allowIP := range p.config.Allow {
-				if p.config.allowAll || remoteIP.Equal(allowIP) {
-					break // allow connection, unless it's also in the deny list
-				}
-			}
-
-			for _, denyIP := range p.config.Deny {
-				if p.config.denyAll || remoteIP.Equal(denyIP) {
-					return // block connection
-				}
-			}
-		}
+	if !p.meetsConnectionPolicies(connection) {
+		log.WithFields(log.Fields{
+			"ip":       connection.RemoteAddr().String(),
+			"policies": p.Config.Policies,
+		}).Warn("Failed to meet policies")
+		return
 	}
 
-	// handle connection
-	remote, err := net.DialTimeout("tcp", p.to, p.timeout)
-	//remote, err := net.Dial("tcp", p.to)
+	remote, err := net.DialTimeout("tcp", p.Config.To, p.Config.Policies.Timeout)
 	if err != nil {
 		return
 	}
 	defer remote.Close()
+
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
-	go p.copy(remote, connection, wg)
-	go p.copy(connection, remote, wg)
+	if p.Config.Monitor.From {
+		fmt.Println("monitoring from")
+		go func() {
+			written, err := p.copy(connection, remote, wg)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"error":       err.Error(),
+					"source":      remote.RemoteAddr().String(),
+					"destination": connection.RemoteAddr().String(),
+				}).Info("monitorFrom")
+			}
+			log.WithFields(log.Fields{
+				"written":     written,
+				"source":      remote.RemoteAddr().String(),
+				"destination": connection.RemoteAddr().String(),
+			}).Info("monitorFrom")
+		}()
+	} else {
+		go p.copy(connection, remote, wg)
+	}
+	if p.Config.Monitor.To {
+		fmt.Println("monitoring to")
+		go func() {
+			written, err := p.copy(remote, connection, wg)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"error":       err.Error(),
+					"source":      remote.RemoteAddr().String(),
+					"destination": connection.RemoteAddr().String(),
+				}).Info("monitorFrom")
+			}
+			log.WithFields(log.Fields{
+				"written":     written,
+				"destination": connection.RemoteAddr().String(),
+				"source":      remote.RemoteAddr().String(),
+			}).Info("monitorTo")
+		}()
+	} else {
+		go p.copy(remote, connection, wg)
+	}
+
 	wg.Wait()
+
+	log.WithFields(log.Fields{
+		"ip": connection.RemoteAddr().String(),
+	}).Info("Processed connection")
 }
 
-func (p *TCP) copy(from, to net.Conn, wg *sync.WaitGroup) {
+func (p *TCP) meetsConnectionPolicies(connection net.Conn) bool {
+	if p.Config.Policies.DenyAll {
+		connection.Close()
+		return false
+	}
+
+	if p.Config.Policies.AllowAll {
+		return true
+	}
+
+	remoteIP := net.ParseIP(strings.Split(connection.RemoteAddr().String(), ":")[0])
+
+	for _, allowIP := range p.Config.Policies.Allow {
+		if remoteIP.Equal(allowIP) {
+			return true
+		}
+	}
+
+	// if explicitly allowing only certain IPs, deny
+	// everything that doesn't match
+	if len(p.Config.Policies.Allow) > 0 {
+		return false
+	}
+
+	for _, denyIP := range p.Config.Policies.Deny {
+		if remoteIP.Equal(denyIP) {
+			connection.Close()
+			return false
+		}
+	}
+
+	// allow all traffic by default
+	return true
+}
+
+func (p *TCP) copy(from, to net.Conn, wg *sync.WaitGroup) (int64, error) {
 	defer wg.Done()
 	select {
 	case <-p.done:
-		return
+		return int64(0), nil
 	default:
-		if _, err := io.Copy(to, from); err != nil {
-			//p.Stop()
-			return
-		}
+		return io.Copy(to, from)
 	}
 }
