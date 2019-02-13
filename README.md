@@ -1,22 +1,47 @@
 # fauxy
 
-Proxy local connections from port `8888` to `7777`:
+A fauxy reverse proxy.
 
-```console
-$ fauxy proxy --from 127.0.0.1:8888 --to 127.0.0.1:7777
-...
+## Request Handling
+
+```plaintext
+TCP Connection -> FROM: Fauxy Proxy :TO -> TCP Connection
+               ^    ^        |       ^   ^
+   Allow/Deny -|    |______Config____|   |
+               |_____________|           |
+      Timeout -|             |           |- Timeout
+               |_____________|___________|
+      Hexdump -|             |           |- Hexdump
+               |_____________|___________|
+               
 ```
 
-Proxy local connections from port `8888` to `7777`, with the following config `config.json`:
+## Configuration
 
 ```json
 {
-    "allow": ["*"],
-    "deny": ["192.168.0.2"]
+    "from": "192.168.0.2:80",
+    "to": "localhost:8080",
+    "policies": {
+        "allowAll": false,
+        "denyAll": false,
+        "allow": ["192.168.0.3", "192.168.0.4"],
+        "deny": ["192.168.0.5"],
+        "rateLimit": {
+            "second": {
+                "3": ["192.168.0.3", "192.168.0.4"]
+            }
+        }
+    },
+    "hexdump": true,
+    "replace": {
+        "*": "hello world!"
+    },
+    "monitor": {
+        "from": true,
+        "to": true,
+    },
+    "logStdout": true,
+    "logFile": "fauxy.80.to.8080.log"
 }
-```
-
-```console
-$ fauxy proxy --from 127.0.0.1:8888 --to 127.0.0.1:7777 --confg config.json
-...
 ```
