@@ -146,8 +146,10 @@ func (p *TCP) Start() error {
 				case connection := <-p.jobChannel:
 					//connection.SetKeepAlive(false)
 					//connection.SetDeadline((time.Now().Add(p.Config.Policies.Timeout)))
-					connection.SetWriteDeadline(time.Now().Add(p.Config.Policies.Timeout))
-					connection.SetReadDeadline(time.Now().Add(p.Config.Policies.Timeout))
+
+					//connection.SetWriteDeadline(time.Now().Add(p.Config.Policies.Timeout))
+					//connection.SetReadDeadline(time.Now().Add(p.Config.Policies.Timeout))
+
 					//go p.handle(connection)
 					p.handle(connection)
 				case <-p.quit:
