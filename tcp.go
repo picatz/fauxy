@@ -86,7 +86,14 @@ func (p *TCP) Start() error {
 	if p.done == nil {
 		p.done = make(chan struct{})
 	}
-	listener, err := net.Listen("tcp", p.Config.From)
+
+	addr, err := net.ResolveTCPAddr("tcp", p.Config.From)
+	if err != nil {
+		panic(err)
+	}
+
+	listener, err := net.ListenTCP("tcp", addr)
+
 	if err != nil {
 		return err
 	}
@@ -96,7 +103,7 @@ func (p *TCP) Start() error {
 			case <-p.done:
 				return
 			default:
-				connection, err := listener.Accept()
+				connection, err := listener.AcceptTCP()
 				if err != nil {
 					continue
 				}
@@ -108,7 +115,7 @@ func (p *TCP) Start() error {
 	return nil
 }
 
-func (p *TCP) handle(connection net.Conn) {
+func (p *TCP) handle(connection *net.TCPConn) {
 	defer connection.Close()
 
 	if !p.meetsConnectionPolicies(connection) {
