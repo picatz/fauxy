@@ -16,6 +16,24 @@ import (
 type TCP struct {
 	Config *Config
 	done   chan struct{}
+
+	workerPool chan chan *net.TCPConn
+	jobChannel chan *net.TCPConn
+	quit       chan bool
+}
+
+// tcpWorker represents the worker that executes the connection
+type tcpWorker struct {
+	workerPool chan chan *net.TCPConn
+	jobChannel chan *net.TCPConn
+	quit       chan bool
+}
+
+func newTCPWorker(workerPool chan chan *net.TCPConn) tcpWorker {
+	return tcpWorker{
+		workerPool: workerPool,
+		jobChannel: make(chan *net.TCPConn),
+		quit:       make(chan bool)}
 }
 
 func setupConfig(config *Config) {
@@ -67,14 +85,11 @@ func NewTCPWithConfigFile(from, to, configFilename string) (Proxy, error) {
 }
 
 // Stop needs to be documented.
-func (p *TCP) Stop() error {
+func (p *TCP) Stop() {
 	log.Warn("Stopping proxy")
-	if p.done == nil {
-		return errors.New("tcp server already stopped")
-	}
-	close(p.done)
-	p.done = nil
-	return nil
+	go func() {
+		p.quit <- true
+	}()
 }
 
 // Start needs to be documented.
@@ -110,6 +125,19 @@ func (p *TCP) Start() error {
 					continue
 				}
 				go p.handle(connection)
+			}
+		}
+	}()
+	go func() {
+		for {
+			// register the current worker into the worker queue.
+			p.workerPool <- p.jobChannel
+			select {
+			case connection := <-p.jobChannel:
+				p.handle(connection)
+			case <-p.quit:
+				// we have received a signal to stop
+				return
 			}
 		}
 	}()
