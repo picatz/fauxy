@@ -2,7 +2,6 @@ package fauxy
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -120,7 +119,6 @@ func (p *TCP) handle(connection net.Conn) {
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
 	if p.Config.Monitor.From {
-		fmt.Println("monitoring from")
 		go func() {
 			written, err := p.copy(connection, remote, wg)
 			if err != nil {
@@ -140,7 +138,6 @@ func (p *TCP) handle(connection net.Conn) {
 		go p.copy(connection, remote, wg)
 	}
 	if p.Config.Monitor.To {
-		fmt.Println("monitoring to")
 		go func() {
 			written, err := p.copy(remote, connection, wg)
 			if err != nil {
@@ -170,10 +167,16 @@ func (p *TCP) handle(connection net.Conn) {
 func (p *TCP) meetsConnectionPolicies(connection net.Conn) bool {
 	if p.Config.Policies.DenyAll {
 		connection.Close()
+		log.WithFields(log.Fields{
+			"ip": connection.RemoteAddr().String(),
+		}).Info("Denied connection")
 		return false
 	}
 
 	if p.Config.Policies.AllowAll {
+		log.WithFields(log.Fields{
+			"ip": connection.RemoteAddr().String(),
+		}).Info("Allowed connection")
 		return true
 	}
 
@@ -181,6 +184,9 @@ func (p *TCP) meetsConnectionPolicies(connection net.Conn) bool {
 
 	for _, allowIP := range p.Config.Policies.Allow {
 		if remoteIP.Equal(allowIP) {
+			log.WithFields(log.Fields{
+				"ip": connection.RemoteAddr().String(),
+			}).Info("Allowed connection")
 			return true
 		}
 	}
@@ -188,17 +194,26 @@ func (p *TCP) meetsConnectionPolicies(connection net.Conn) bool {
 	// if explicitly allowing only certain IPs, deny
 	// everything that doesn't match
 	if len(p.Config.Policies.Allow) > 0 {
+		log.WithFields(log.Fields{
+			"ip": connection.RemoteAddr().String(),
+		}).Info("Denied connection")
 		return false
 	}
 
 	for _, denyIP := range p.Config.Policies.Deny {
 		if remoteIP.Equal(denyIP) {
 			connection.Close()
+			log.WithFields(log.Fields{
+				"ip": connection.RemoteAddr().String(),
+			}).Info("Denied connection")
 			return false
 		}
 	}
 
 	// allow all traffic by default
+	log.WithFields(log.Fields{
+		"ip": connection.RemoteAddr().String(),
+	}).Info("Allowed connection")
 	return true
 }
 
@@ -208,6 +223,10 @@ func (p *TCP) copy(from, to net.Conn, wg *sync.WaitGroup) (int64, error) {
 	case <-p.done:
 		return int64(0), nil
 	default:
+		log.WithFields(log.Fields{
+			"source":      from.RemoteAddr().String(),
+			"destination": to.RemoteAddr().String(),
+		}).Info("Copying bytes")
 		return io.Copy(to, from)
 	}
 }
