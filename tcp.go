@@ -137,45 +137,8 @@ func (p *TCP) handle(connection *net.TCPConn) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(2)
-	if p.Config.Monitor.From {
-		go func() {
-			written, err := p.copy(connection, remote, wg)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"error":       err.Error(),
-					"source":      remote.RemoteAddr().String(),
-					"destination": connection.RemoteAddr().String(),
-				}).Info("monitorFrom")
-			}
-			log.WithFields(log.Fields{
-				"written":     written,
-				"source":      remote.RemoteAddr().String(),
-				"destination": connection.RemoteAddr().String(),
-			}).Info("monitorFrom")
-		}()
-	} else {
-		go p.copy(connection, remote, wg)
-	}
-	if p.Config.Monitor.To {
-		go func() {
-			written, err := p.copy(remote, connection, wg)
-			if err != nil {
-				log.WithFields(log.Fields{
-					"error":       err.Error(),
-					"source":      remote.RemoteAddr().String(),
-					"destination": connection.RemoteAddr().String(),
-				}).Info("monitorFrom")
-			}
-			log.WithFields(log.Fields{
-				"written":     written,
-				"destination": connection.RemoteAddr().String(),
-				"source":      remote.RemoteAddr().String(),
-			}).Info("monitorTo")
-		}()
-	} else {
-		go p.copy(remote, connection, wg)
-	}
-
+	go p.copy(connection, remote, wg)
+	go p.copy(remote, connection, wg)
 	wg.Wait()
 
 	log.WithFields(log.Fields{
@@ -236,16 +199,40 @@ func (p *TCP) meetsConnectionPolicies(connection net.Conn) bool {
 	return true
 }
 
+type ioCopyInfo struct {
+	Written int64
+	Error   error
+}
+
 func (p *TCP) copy(from, to net.Conn, wg *sync.WaitGroup) (int64, error) {
-	defer wg.Done()
-	select {
-	case <-p.done:
-		return int64(0), nil
-	default:
+	ioCopyDone := make(chan *ioCopyInfo, 0)
+	go func() {
 		log.WithFields(log.Fields{
 			"source":      from.RemoteAddr().String(),
 			"destination": to.RemoteAddr().String(),
 		}).Info("Copying bytes")
-		return io.Copy(to, from)
+		written, err := io.Copy(to, from)
+		ioCopyDone <- &ioCopyInfo{
+			Written: written,
+			Error:   err,
+		}
+	}()
+	defer wg.Done()
+	select {
+	case <-p.done:
+		return int64(0), nil
+	case <-time.After(p.Config.Policies.Timeout):
+		log.WithFields(log.Fields{
+			"source":      from.RemoteAddr().String(),
+			"destination": to.RemoteAddr().String(),
+		}).Info("Hit timeout")
+		return int64(0), nil
+	case info := <-ioCopyDone:
+		log.WithFields(log.Fields{
+			"written":     info.Written,
+			"source":      from.RemoteAddr().String(),
+			"destination": to.RemoteAddr().String(),
+		}).Info("Copied bytes")
+		return info.Written, info.Error
 	}
 }
