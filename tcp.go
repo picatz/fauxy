@@ -105,6 +105,9 @@ func (p *TCP) Start() error {
 			default:
 				connection, err := listener.AcceptTCP()
 				if err != nil {
+					log.WithFields(log.Fields{
+						"error": err.Error(),
+					}).Warn("Error while accepting new TCP connections")
 					continue
 				}
 				go p.handle(connection)
