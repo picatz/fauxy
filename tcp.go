@@ -6,7 +6,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -114,7 +113,6 @@ func (p *TCP) Start() error {
 			}
 		}
 	}()
-	log.Info("Started proxy")
 	return nil
 }
 
@@ -138,15 +136,15 @@ func (p *TCP) handle(connection *net.TCPConn) {
 	}
 	defer remote.Close()
 
-	wg := &sync.WaitGroup{}
-	wg.Add(2)
-	go p.copy(connection, remote, wg)
-	go p.copy(remote, connection, wg)
-	wg.Wait()
+	stop := make(chan struct{})
 
-	log.WithFields(log.Fields{
-		"ip": connection.RemoteAddr().String(),
-	}).Info("Processed connection")
+	go p.copy(connection, remote, stop)
+	go p.copy(remote, connection, stop)
+
+	select {
+	case <-stop:
+		return
+	}
 }
 
 func (p *TCP) meetsConnectionPolicies(connection net.Conn) bool {
@@ -207,7 +205,21 @@ type ioCopyInfo struct {
 	Error   error
 }
 
-func (p *TCP) copy(from, to net.Conn, wg *sync.WaitGroup) (int64, error) {
+func (p *TCP) copy(from, to net.Conn, stop chan struct{}) (int64, error) {
+	defer to.Close()
+	defer from.Close()
+	written, err := io.Copy(to, from)
+	if err != nil {
+		return int64(0), nil
+	}
+	log.WithFields(log.Fields{
+		"written":     written,
+		"source":      from.RemoteAddr().String(),
+		"destination": to.RemoteAddr().String(),
+	}).Info("Copied bytes")
+	stop <- struct{}{}
+	return written, err
+
 	ioCopyDone := make(chan *ioCopyInfo, 0)
 	go func() {
 		log.WithFields(log.Fields{
@@ -220,7 +232,7 @@ func (p *TCP) copy(from, to net.Conn, wg *sync.WaitGroup) (int64, error) {
 			Error:   err,
 		}
 	}()
-	defer wg.Done()
+	//defer wg.Done()
 	select {
 	case <-p.done:
 		return int64(0), nil
