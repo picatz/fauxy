@@ -35,9 +35,8 @@ TCP Connection -> FROM: Fauxy Proxy :TO -> TCP Connection
         }
     },
     "hexdump": true,
-    "monitor": {
-        "from": true,
-        "to": true,
+     "monitor": {
+        "bytes_copied": true
     },
     "log": {
         "stdout": true,
