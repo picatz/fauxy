@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,14 +19,22 @@ type TCP struct {
 	done   chan struct{}
 }
 
-// NewTCP needs to be documented.
-func NewTCP(config *Config) Proxy {
+func setupLogger(config *Config) {
 	if config.Log.Stdout {
 		log.SetOutput(os.Stdout)
 	}
 	if config.Log.Stderr {
 		log.SetOutput(os.Stderr)
 	}
+	formatter := &logrus.TextFormatter{
+		FullTimestamp: true,
+	}
+	logrus.SetFormatter(formatter)
+}
+
+// NewTCP needs to be documented.
+func NewTCP(config *Config) Proxy {
+	setupLogger(config)
 	return &TCP{
 		Config: config,
 		done:   make(chan struct{}),
@@ -43,7 +52,7 @@ func NewTCPWithConfigFile(from, to, configFilename string) (Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	setupLogger(config)
 	return &TCP{
 		Config: config,
 		done:   make(chan struct{}),
