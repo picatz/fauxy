@@ -9,8 +9,7 @@
     },
     "hexdump": true,
     "monitor": {
-        "from": true,
-        "to": true
+        "bytes_copied": true
     },
     "log": {
         "stdout": true,
