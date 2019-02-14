@@ -2,6 +2,21 @@
 
 Work in progress.
 
+Proxy connections from `:8080` to `localhost:4567` with `tmp/allow_all.json`:
+
+```json
+{
+    "policies": {
+        "allowAll": true
+    }
+}
+```
+
+```console
+$ fauxy proxy --from :8888 --to localhost:4567 --config tmp/allow_all.json
+...
+```
+
 ## Request Handling
 
 ```plaintext
