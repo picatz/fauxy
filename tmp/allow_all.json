@@ -1,4 +1,5 @@
 {
-    "allow": ["*"],
-    "deny": []
+    "policies": {
+        "allowAll": true
+    }
 }
