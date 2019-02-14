@@ -35,16 +35,6 @@ func main() {
 		Short: "Proxy connections from one endpoint to anouther",
 		Args:  cobra.NoArgs,
 		Run: func(cmd *cobra.Command, args []string) {
-			if cmdProxyFrom == "" || !strings.Contains(cmdProxyFrom, ":") {
-				fmt.Println("invalid or missing '--from' flag")
-				os.Exit(1)
-			}
-
-			if cmdProxyTo == "" || !strings.Contains(cmdProxyTo, ":") {
-				fmt.Println("invalid or missing '--to' flag")
-				os.Exit(1)
-			}
-
 			wg := &sync.WaitGroup{}
 
 			var config *fauxy.Config
@@ -57,14 +47,29 @@ func main() {
 					os.Exit(1)
 				}
 			} else {
-				config = fauxy.NewDefaultConfig()
+				config = fauxy.NewDefaultConfig(cmdProxyFrom, cmdProxyTo)
 			}
 
-			tcpProxy := fauxy.NewTCP(
-				cmdProxyFrom, // from
-				cmdProxyTo,   // to
-				config,       // config
-			)
+			config.From = cmdProxyFrom
+			config.To = cmdProxyTo
+
+			passedFromToCheck := true
+
+			if !strings.Contains(config.From, ":") {
+				fmt.Println("invalid or missing '--from' flag")
+				passedFromToCheck = false
+			}
+
+			if !strings.Contains(config.To, ":") {
+				fmt.Println("invalid or missing '--to' flag")
+				passedFromToCheck = false
+			}
+
+			if !passedFromToCheck {
+				os.Exit(1)
+			}
+
+			tcpProxy := fauxy.NewTCP(config)
 
 			tcpProxy.Start()
 
