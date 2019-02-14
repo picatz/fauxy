@@ -140,11 +140,11 @@ func (p *TCP) Start() error {
 	}()
 	for i := 1; i <= runtime.NumCPU(); i++ {
 		log.Info("Starting worker", i)
-		go func() {
+		go func(workerID int) {
 			for {
 				select {
 				case connection := <-p.jobChannel:
-					log.Info("Handling connection")
+					log.Info("Handling connection with worker", workerID)
 					connection.SetNoDelay(!p.Config.Policies.Nagle)
 					connection.SetKeepAlive(p.Config.Policies.KeepAlive)
 					p.handle(connection)
@@ -153,7 +153,7 @@ func (p *TCP) Start() error {
 					return
 				}
 			}
-		}()
+		}(i)
 	}
 	return nil
 }
