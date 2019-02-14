@@ -6,8 +6,7 @@
         "allow": ["127.0.0.1"]
     },
     "monitor": {
-        "from": true,
-        "to": true
+        "bytes_copied": true
     },
     "log": {
         "stderr": true
