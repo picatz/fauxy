@@ -159,6 +159,8 @@ func (p *TCP) handle(connection *net.TCPConn) {
 		return
 	}
 
+	connection.SetNoDelay(!p.Config.Policies.Nagle)
+
 	remote, err := net.DialTimeout("tcp", p.Config.To, p.Config.Policies.Timeout)
 	if err != nil {
 		log.WithFields(log.Fields{
