@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -128,19 +129,22 @@ func (p *TCP) Start() error {
 			}
 		}
 	}()
-	go func() {
-		for {
-			// register the current worker into the worker queue.
-			p.workerPool <- p.jobChannel
-			select {
-			case connection := <-p.jobChannel:
-				p.handle(connection)
-			case <-p.quit:
-				// we have received a signal to stop
-				return
+	for i := 1; i <= runtime.NumCPU(); i++ {
+		log.Info("Starting worker", i)
+		go func() {
+			for {
+				// register the current worker into the worker queue.
+				p.workerPool <- p.jobChannel
+				select {
+				case connection := <-p.jobChannel:
+					p.handle(connection)
+				case <-p.quit:
+					// we have received a signal to stop
+					return
+				}
 			}
-		}
-	}()
+		}()
+	}
 	return nil
 }
 
