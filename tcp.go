@@ -128,7 +128,9 @@ func (p *TCP) handle(connection *net.TCPConn) {
 
 	remote, err := net.DialTimeout("tcp", p.Config.To, p.Config.Policies.Timeout)
 	if err != nil {
-		return
+		log.WithFields(log.Fields{
+			"error": err.Error(),
+		}).Info("Error during proxy connection")
 	}
 	defer remote.Close()
 
