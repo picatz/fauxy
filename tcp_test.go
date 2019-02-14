@@ -21,7 +21,7 @@ func TestTCP(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			buff := make([]byte, 12)
+			buff := make([]byte, 14)
 			conn.Read(buff)
 			fmt.Println("server read:", string(buff))
 			go func() {
@@ -29,7 +29,6 @@ func TestTCP(t *testing.T) {
 				conn.Write([]byte("hello world\n"))
 			}()
 		}
-
 	}()
 
 	config, err := NewConfigFromFile("tmp/tcp_test.json")
