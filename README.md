@@ -28,7 +28,6 @@ TCP Connection -> FROM: Fauxy Proxy :TO -> TCP Connection
                |_____________|___________|
       Hexdump -|             |           |- Hexdump
                |_____________|___________|
-               |
 
 ```
 
@@ -42,12 +41,7 @@ TCP Connection -> FROM: Fauxy Proxy :TO -> TCP Connection
         "allowAll": false,
         "denyAll": false,
         "allow": ["192.168.0.3", "192.168.0.4"],
-        "deny": ["192.168.0.5"],
-        "rateLimit": {
-            "second": {
-                "3": ["192.168.0.3", "192.168.0.4"]
-            }
-        }
+        "deny": ["192.168.0.5"]
     },
     "hexdump": true,
      "monitor": {
