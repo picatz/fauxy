@@ -107,7 +107,7 @@ func (p *TCP) Start() error {
 				if err != nil {
 					continue
 				}
-				p.handle(connection)
+				go p.handle(connection)
 			}
 		}
 	}()
