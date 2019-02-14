@@ -9,8 +9,8 @@ import (
 
 // Config needs to be documented
 type Config struct {
-	From     string `json:"from"`
-	To       string `json:"to"`
+	From     string `json:"from,omitempty"`
+	To       string `json:"to,omitempty"`
 	Policies struct {
 		AllowAll bool          `json:"allowAll,omitempty"`
 		DenyAll  bool          `json:"denyAll,omitempty"`
@@ -20,14 +20,13 @@ type Config struct {
 	} `json:"policies,omitempty"`
 	Hexdump bool `json:"hexdump,omitempty"`
 	Monitor struct {
-		From bool `json:"from,omitempty"`
-		To   bool `json:"to,omitempty"`
+		BytesCopied bool `json:"bytes_copied,omitempty"`
 	} `json:"monitor,omitempty"`
 	Log struct {
 		Stderr bool `json:"stderr,omitempty"`
 		Stdout bool `json:"stdout,omitempty"`
 		File   bool `json:"file,omitempty"`
-	}
+	} `json:"log,omitempty"`
 }
 
 // NewDefaultConfig needs to be documented.
