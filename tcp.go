@@ -200,17 +200,18 @@ func (p *TCP) meetsConnectionPolicies(connection net.Conn) bool {
 	return true
 }
 
-type ioCopyInfo struct {
-	Written int64
-	Error   error
-}
-
 func (p *TCP) copy(from, to net.Conn, stop chan struct{}) (int64, error) {
 	defer to.Close()
 	defer from.Close()
 	written, err := io.Copy(to, from)
 	if err != nil {
-		return int64(0), nil
+		log.WithFields(log.Fields{
+			"written":     written,
+			"error":       err,
+			"source":      from.RemoteAddr().String(),
+			"destination": to.RemoteAddr().String(),
+		}).Warn("Error while copying bytes")
+		return written, err
 	}
 	log.WithFields(log.Fields{
 		"written":     written,
@@ -219,35 +220,4 @@ func (p *TCP) copy(from, to net.Conn, stop chan struct{}) (int64, error) {
 	}).Info("Copied bytes")
 	stop <- struct{}{}
 	return written, err
-
-	ioCopyDone := make(chan *ioCopyInfo, 0)
-	go func() {
-		log.WithFields(log.Fields{
-			"source":      from.RemoteAddr().String(),
-			"destination": to.RemoteAddr().String(),
-		}).Info("Copying bytes")
-		written, err := io.Copy(to, from)
-		ioCopyDone <- &ioCopyInfo{
-			Written: written,
-			Error:   err,
-		}
-	}()
-	//defer wg.Done()
-	select {
-	case <-p.done:
-		return int64(0), nil
-	case <-time.After(p.Config.Policies.Timeout):
-		log.WithFields(log.Fields{
-			"source":      from.RemoteAddr().String(),
-			"destination": to.RemoteAddr().String(),
-		}).Info("Hit timeout")
-		return int64(0), nil
-	case info := <-ioCopyDone:
-		log.WithFields(log.Fields{
-			"written":     info.Written,
-			"source":      from.RemoteAddr().String(),
-			"destination": to.RemoteAddr().String(),
-		}).Info("Copied bytes")
-		return info.Written, info.Error
-	}
 }
