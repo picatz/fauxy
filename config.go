@@ -12,11 +12,14 @@ type Config struct {
 	From     string `json:"from,omitempty"`
 	To       string `json:"to,omitempty"`
 	Policies struct {
-		AllowAll bool          `json:"allowAll,omitempty"`
-		DenyAll  bool          `json:"denyAll,omitempty"`
-		Allow    []net.IP      `json:"allow,omitempty"`
-		Deny     []net.IP      `json:"deny,omitempty"`
-		Timeout  time.Duration `json:"timeout,omitempty"`
+		AllowAll  bool          `json:"allowAll,omitempty"`
+		DenyAll   bool          `json:"denyAll,omitempty"`
+		Allow     []net.IP      `json:"allow,omitempty"`
+		Deny      []net.IP      `json:"deny,omitempty"`
+		Timeout   time.Duration `json:"timeout,omitempty"`
+		Deadline  time.Time     `json:"deadline,omitempty"`
+		Nagle     bool          `json:"nagle,omitempty"`
+		KeepAlive bool          `json:"keep_alive,omitempty"`
 	} `json:"policies,omitempty"`
 	Hexdump bool `json:"hexdump,omitempty"`
 	Monitor struct {
