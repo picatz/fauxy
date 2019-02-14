@@ -18,7 +18,7 @@ type TCP struct {
 	Config *Config
 	done   chan struct{}
 
-	workerPool chan chan *net.TCPConn
+	workerPool []tcpWorker
 	jobChannel chan *net.TCPConn
 	quit       chan bool
 }
@@ -33,7 +33,7 @@ type tcpWorker struct {
 func newTCPWorker(workerPool chan chan *net.TCPConn) tcpWorker {
 	return tcpWorker{
 		workerPool: workerPool,
-		jobChannel: make(chan *net.TCPConn),
+		jobChannel: make(chan *net.TCPConn, runtime.NumCPU()),
 		quit:       make(chan bool)}
 }
 
@@ -61,8 +61,10 @@ func NewTCP(config *Config) Proxy {
 	setupConfig(config)
 	setupLogger(config)
 	return &TCP{
-		Config: config,
-		done:   make(chan struct{}),
+		Config:     config,
+		done:       make(chan struct{}),
+		jobChannel: make(chan *net.TCPConn, runtime.NumCPU()),
+		quit:       make(chan bool, runtime.NumCPU()),
 	}
 }
 
@@ -80,17 +82,24 @@ func NewTCPWithConfigFile(from, to, configFilename string) (Proxy, error) {
 	setupConfig(config)
 	setupLogger(config)
 	return &TCP{
-		Config: config,
-		done:   make(chan struct{}),
+		Config:     config,
+		done:       make(chan struct{}),
+		jobChannel: make(chan *net.TCPConn, runtime.NumCPU()),
+		quit:       make(chan bool),
 	}, nil
 }
 
 // Stop needs to be documented.
 func (p *TCP) Stop() {
 	log.Warn("Stopping proxy")
+	allWorkersStopped := make(chan bool)
 	go func() {
-		p.quit <- true
+		for i := 1; i <= runtime.NumCPU(); i++ {
+			p.quit <- true
+		}
+		allWorkersStopped <- true
 	}()
+	<-allWorkersStopped
 }
 
 // Start needs to be documented.
@@ -125,7 +134,7 @@ func (p *TCP) Start() error {
 					}).Warn("Error while accepting new TCP connections")
 					continue
 				}
-				go p.handle(connection)
+				p.jobChannel <- connection
 			}
 		}
 	}()
@@ -133,10 +142,13 @@ func (p *TCP) Start() error {
 		log.Info("Starting worker", i)
 		go func() {
 			for {
-				// register the current worker into the worker queue.
-				p.workerPool <- p.jobChannel
 				select {
 				case connection := <-p.jobChannel:
+					//connection.SetKeepAlive(false)
+					//connection.SetDeadline((time.Now().Add(p.Config.Policies.Timeout)))
+					connection.SetWriteDeadline(time.Now().Add(p.Config.Policies.Timeout))
+					connection.SetReadDeadline(time.Now().Add(p.Config.Policies.Timeout))
+					//go p.handle(connection)
 					p.handle(connection)
 				case <-p.quit:
 					// we have received a signal to stop
