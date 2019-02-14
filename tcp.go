@@ -130,7 +130,8 @@ func (p *TCP) handle(connection *net.TCPConn) {
 	if err != nil {
 		log.WithFields(log.Fields{
 			"error": err.Error(),
-		}).Info("Error during proxy connection")
+		}).Warn("Error during proxy connection")
+		return
 	}
 	defer remote.Close()
 
