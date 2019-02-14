@@ -17,7 +17,6 @@ type Config struct {
 		Allow    []net.IP      `json:"allow,omitempty"`
 		Deny     []net.IP      `json:"deny,omitempty"`
 		Timeout  time.Duration `json:"timeout,omitempty"`
-		Nagle    bool          `json:"nagle,omitempty"`
 	} `json:"policies,omitempty"`
 	Hexdump bool `json:"hexdump,omitempty"`
 	Monitor struct {
