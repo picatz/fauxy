@@ -2,6 +2,7 @@
     "from": "192.168.0.2:80",
     "to": "localhost:8080",
     "policies": {
+        "nagle": true,
         "allowAll": false,
         "denyAll": false,
         "allow": ["192.168.0.3", "192.168.0.4"],
