@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -16,6 +17,12 @@ import (
 type TCP struct {
 	Config *Config
 	done   chan struct{}
+}
+
+func setupConfig(config *Config) {
+	if config.Policies.Timeout <= 0 {
+		config.Policies.Timeout = time.Millisecond * 1000
+	}
 }
 
 func setupLogger(config *Config) {
@@ -33,6 +40,7 @@ func setupLogger(config *Config) {
 
 // NewTCP needs to be documented.
 func NewTCP(config *Config) Proxy {
+	setupConfig(config)
 	setupLogger(config)
 	return &TCP{
 		Config: config,
@@ -51,6 +59,7 @@ func NewTCPWithConfigFile(from, to, configFilename string) (Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
+	setupConfig(config)
 	setupLogger(config)
 	return &TCP{
 		Config: config,
