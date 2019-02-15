@@ -1,0 +1,6 @@
+{
+    "hexdump": true,
+    "log": {
+        "stderr": true
+    }
+}
