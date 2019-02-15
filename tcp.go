@@ -1,6 +1,8 @@
 package fauxy
 
 import (
+	"bytes"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net"
@@ -147,6 +149,7 @@ func (p *TCP) Start() error {
 					log.Info("Handling connection with worker", workerID)
 					connection.SetNoDelay(!p.Config.Policies.Nagle)
 					connection.SetKeepAlive(p.Config.Policies.KeepAlive)
+					connection.SetLinger(0)
 					p.handle(connection)
 				case <-p.quit:
 					log.Warn("Stopping worker")
@@ -245,7 +248,25 @@ func (p *TCP) meetsConnectionPolicies(connection net.Conn) bool {
 func (p *TCP) copy(from, to net.Conn, stop chan struct{}) (int64, error) {
 	defer to.Close()
 	defer from.Close()
-	written, err := io.Copy(to, from)
+
+	var (
+		err     error
+		written int64
+		hexBuff bytes.Buffer
+	)
+
+	if p.Config.Hexdump {
+		multiWriter := io.MultiWriter(to, &hexBuff)
+		written, err = io.Copy(multiWriter, from)
+		log.WithFields(log.Fields{
+			"bytes":       strings.TrimSpace(hex.Dump(hexBuff.Bytes())),
+			"source":      from.RemoteAddr().String(),
+			"destination": to.RemoteAddr().String(),
+		}).Info("Hexdump")
+	} else {
+		written, err = io.Copy(to, from)
+	}
+
 	if err != nil {
 		log.WithFields(log.Fields{
 			"written":     written,
@@ -253,13 +274,15 @@ func (p *TCP) copy(from, to net.Conn, stop chan struct{}) (int64, error) {
 			"source":      from.RemoteAddr().String(),
 			"destination": to.RemoteAddr().String(),
 		}).Warn("Error while copying bytes")
-		return written, err
+	} else {
+		log.WithFields(log.Fields{
+			"written":     written,
+			"source":      from.RemoteAddr().String(),
+			"destination": to.RemoteAddr().String(),
+		}).Info("Copied bytes")
 	}
-	log.WithFields(log.Fields{
-		"written":     written,
-		"source":      from.RemoteAddr().String(),
-		"destination": to.RemoteAddr().String(),
-	}).Info("Copied bytes")
+
 	stop <- struct{}{}
+
 	return written, err
 }
