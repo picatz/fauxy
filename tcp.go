@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -258,11 +259,12 @@ func (p *TCP) copy(from, to net.Conn, stop chan struct{}) (int64, error) {
 	if p.Config.Hexdump {
 		multiWriter := io.MultiWriter(to, &hexBuff)
 		written, err = io.Copy(multiWriter, from)
-		log.WithFields(log.Fields{
-			"bytes":       strings.TrimSpace(hex.Dump(hexBuff.Bytes())),
-			"source":      from.RemoteAddr().String(),
-			"destination": to.RemoteAddr().String(),
-		}).Info("Hexdump")
+		fmt.Println(hex.Dump(hexBuff.Bytes()))
+		//log.WithFields(log.Fields{
+		//	"bytes":       strings.TrimSpace(hex.Dump(hexBuff.Bytes())),
+		//	"source":      from.RemoteAddr().String(),
+		//	"destination": to.RemoteAddr().String(),
+		//}).Info("Hexdump")
 	} else {
 		written, err = io.Copy(to, from)
 	}
