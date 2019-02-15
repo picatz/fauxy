@@ -6,6 +6,7 @@
         "timeout": 1000000000,
         "allow": ["127.0.0.1"]
     },
+    "hexdump": true,
     "monitor": {
         "bytes_copied": true
     },
